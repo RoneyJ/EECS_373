@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/jproney/ros_ws/install/setup.sh
