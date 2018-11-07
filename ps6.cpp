@@ -16,13 +16,18 @@
 #include <string>
 using namespace std;
 
+string object_name("shipping_box");  //hard-coded object name for box
+
 bool g_take_new_snapshot = false;
+double z_position = 0.0;
 osrf_gear::LogicalCameraImage g_cam1_data;
 
 void cam2CB(const osrf_gear::LogicalCameraImage& message_holder) {
     if (g_take_new_snapshot) {
         ROS_INFO_STREAM("image from cam1: " << message_holder << endl);
         g_cam1_data = message_holder;
+	if(g_cam1_data.models.size() > 0)
+	    z_position = g_cam1_data.models[0].pose.position.z;
         g_take_new_snapshot = false;
     }
 }
@@ -41,7 +46,7 @@ int main(int argc, char **argv) {
     ros::ServiceClient drone_client = n.serviceClient<osrf_gear::DroneControl>("/ariac/drone");
     osrf_gear::DroneControl drone_srv;
 
-    ross::Subscriber cam2_subscriber = n.subscribe("/ariac/logical_camera_2", 1, cam2CB);
+    ros::Subscriber cam2_subscriber = n.subscribe("/ariac/logical_camera_2", 1, cam2CB);
 
     startup_srv.response.success = false;
 
@@ -62,19 +67,49 @@ int main(int argc, char **argv) {
     }
     ROS_INFO("got successful response from conveyor service");
 
-    ROS_INFO("I see a box");
-
-    g_take_new_snapshot = true;
-
-    //nest within another loop
     while (g_cam1_data.models.size() < 1) {
-        ros::SpinOnce();
+	g_take_new_snapshot = true;
+        ros::spinOnce();
         ros::Duration(0.5).sleep();
     }
+    ROS_INFO("I see a box");
+
+    bool box_aligned = false;
+    while(!box_aligned){
+	g_take_new_snapshot = true;
+	if(z_position > -0.01 && z_position < 0.01)
+	    box_aligned = true;
+	ros::spinOnce();
+	ros::Duration(0.1).sleep();
+    }
+
+    ROS_INFO("halting conveyor for 5 seconds");
+    conveyor_srv.request.power = 0.0;
+    conveyor_srv.response.success = false;
+    while (!conveyor_srv.response.success) {
+        ROS_WARN("not successful halting conveyor yet...");
+        conveyor_client.call(conveyor_srv);
+        ros::Duration(0.5).sleep();
+    }
+    ROS_INFO("got successful response from conveyor service");    
+
+    //stop conveyor for 5 seconds
+    ros::Duration(5.0).sleep();
+    
+    ROS_INFO("restarting conveyor");
+    ROS_INFO("got successful response from startup service");
+    conveyor_srv.request.power = 100.0;
+    conveyor_srv.response.success = false;
+    while (!conveyor_srv.response.success) {
+        ROS_WARN("not successful starting conveyor yet...");
+        conveyor_client.call(conveyor_srv);
+        ros::Duration(0.5).sleep();
+    }
+    ROS_INFO("got successful response from conveyor service");
 
     drone_srv.request.shipment_type = "dummy";
 
-    drone_srv.response.success = false
+    drone_srv.response.success = false;
 
     while (!drone_srv.response.success) {
         ROS_WARN("not successful starting drone yet...");
