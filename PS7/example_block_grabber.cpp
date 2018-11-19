@@ -23,12 +23,36 @@
 #include <std_srvs/SetBool.h>
 using namespace std;
 
+double pos_x = 0.5;
+double pos_y = 0.0;
+double pos_z = 0.035;
+double roll = 0.0, pitch = 0.0, yaw = 0.0;
+int mark = 0;
+
+void callBack(const geometry_msgs::PoseStamped& msg){
+  if(mark == 0){  
+	pos_x = msg.pose.position.x;
+	pos_y = msg.pose.position.y;
+	roll = msg.pose.orientation.x;
+	pitch = msg.pose.orientation.y;
+	yaw = msg.pose.orientation.z;
+	mark++;
+  }
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "example_arm_cart_move_ac"); // name this node 
+    
+    // Subscribe to the openCV node and receives coords that it is publishing
+    // Command robot to grab the block
+   
+    
     ros::NodeHandle nh; //standard ros node handle     
     CartMotionCommander cart_motion_commander;
     XformUtils xformUtils;
     ros::ServiceClient client = nh.serviceClient<std_srvs::SetBool>("/sticky_finger/link6");
+    //Subscriber to openCV node
+    ros::Subscriber sub = nh.subscribe("block_pose",1,callBack);
     std_srvs::SetBool srv;
     srv.request.data = true;
 
@@ -81,7 +105,7 @@ int main(int argc, char** argv) {
     while (ros::ok()) {
         //move out of way for camera view:
         ROS_INFO("moving out of camera view");
-        tool_pose.pose.position.y=0.3; 
+        tool_pose.pose.position.y=-0.2; 
         tool_pose.pose.position.z = 0.3; //0.01;          
         ROS_INFO("requesting plan to descend:");
         xformUtils.printPose(tool_pose);
@@ -94,10 +118,22 @@ int main(int argc, char** argv) {
             ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
         }        
         
-        //move to approach pose:
+        //Make sure subscriber gets block centroid coordinates
+        for(int i = 0; i < 4; i++){
+          ros::spinOnce();
+          ros::Duration(0.5).sleep();
+        }
+        
+        //Move arm to just above block
         ROS_INFO("moving to approach pose");
-        tool_pose.pose.position.y=0.0; 
-        tool_pose.pose.position.z = 0.05; //0.01;          
+        tool_pose.pose.position.y=pos_y; 
+        tool_pose.pose.position.x=pos_x; 
+        tool_pose.pose.position.z = 0.05; //0.01;  
+        // Here, set orientation of Z to what we get from the publisher
+        tool_pose.pose.orientation.x = roll;
+        tool_pose.pose.orientation.y = pitch;
+        tool_pose.pose.orientation.z = yaw;
+        
         ROS_INFO("requesting plan to descend:");
         xformUtils.printPose(tool_pose);
         rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
@@ -109,12 +145,9 @@ int main(int argc, char** argv) {
             ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
         }           
         
-        
-        ROS_INFO("moving to grasp pose");
-        //lower tool to approach part to grasp
-        //tool_pose.pose.position.y=0; 
-        tool_pose.pose.position.z = 0.0343; //block is 0.035 high      
-
+		//Move arm to touch block
+        ROS_INFO("moving to approach pose");
+        tool_pose.pose.position.z = 0.0343; //0.01;          
         ROS_INFO("requesting plan to descend:");
         xformUtils.printPose(tool_pose);
         rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
@@ -124,22 +157,30 @@ int main(int argc, char** argv) {
             ros::Duration(arrival_time + 0.2).sleep();
         } else {
             ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
-        }
-
-        ROS_INFO("enabling vacuum gripper");
+        }           
+        
         //enable the vacuum gripper:
         srv.request.data = true;
+        ros::spinOnce();
         while (!client.call(srv) && ros::ok()) {
+	        ROS_WARN("Inside the loop for the succ");
             ROS_INFO("Sending command to gripper...");
+            ROS_INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+	        ROS_INFO("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+
             ros::spinOnce();
             ros::Duration(0.5).sleep();
         }
-
+        ROS_INFO("Gripped object from vacuum");
+        
 
 
         ROS_INFO("requesting plan to depart with grasped object:");
         tool_pose.pose.position.z = 0.3;         
-
+        tool_pose.pose.orientation.x = 0.0;
+        tool_pose.pose.orientation.y = 0.0;
+        tool_pose.pose.orientation.z = 0.0;
+       
         xformUtils.printPose(tool_pose);
         rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
         if (rtn_val == arm_motion_action::arm_interfaceResult::SUCCESS) {
@@ -150,6 +191,31 @@ int main(int argc, char** argv) {
             ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
         }
 
+	 	// Move block to specified coordinates of (xxx,xxx,xxx) 
+        tool_pose.pose.position.x = 0.3;         
+		tool_pose.pose.position.y = 0.3;         
+        xformUtils.printPose(tool_pose);
+        rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
+        if (rtn_val == arm_motion_action::arm_interfaceResult::SUCCESS) {
+            ROS_INFO("successful plan; command execution of trajectory");
+            rtn_val = cart_motion_commander.execute_planned_traj();
+            ros::Duration(arrival_time + 0.2).sleep();
+        } else {
+            ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
+        }
+        
+        //Descend until block touches ground
+        tool_pose.pose.position.z = 0.035;       
+        xformUtils.printPose(tool_pose);
+        rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
+        if (rtn_val == arm_motion_action::arm_interfaceResult::SUCCESS) {
+            ROS_INFO("successful plan; command execution of trajectory");
+            rtn_val = cart_motion_commander.execute_planned_traj();
+            ros::Duration(arrival_time + 0.2).sleep();
+        } else {
+            ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
+        }
+        
         //disable the vacuum gripper:
 
         srv.request.data = false;
@@ -158,6 +224,21 @@ int main(int argc, char** argv) {
             ros::spinOnce();
             ros::Duration(0.5).sleep();
         }
+        
+        //Ascend to height of z = 0.1
+        tool_pose.pose.position.z = 0.1;      
+        xformUtils.printPose(tool_pose);
+        rtn_val = cart_motion_commander.plan_cartesian_traj_qprev_to_des_tool_pose(nsteps, arrival_time, tool_pose);
+        if (rtn_val == arm_motion_action::arm_interfaceResult::SUCCESS) {
+            ROS_INFO("successful plan; command execution of trajectory");
+            rtn_val = cart_motion_commander.execute_planned_traj();
+            ros::Duration(arrival_time + 0.2).sleep();
+        } else {
+            ROS_WARN("unsuccessful plan; rtn_code = %d", rtn_val);
+        }
+        
+        mark = 0;
+        
     }
 
     return 0;

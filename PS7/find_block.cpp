@@ -11,10 +11,24 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <geometry_msgs/PoseStamped.h>
 #include <xform_utils/xform_utils.h>
+#include <cmath>
 
 static const std::string OPENCV_WINDOW = "Open-CV display window";
 using namespace std;
 
+double g_scale = 0.002967; //ORIGINAL
+//double g_scale = 0.0030197051;
+double g_central_X = 0.543;
+double g_central_Y = 0.321;
+int g_central_I = 319;
+int g_central_J = 239;
+double g_theta = 0.205048;
+
+// Temp stuff used to replace what theta is meant to be, used in getting value for the transofrm matrix
+//double quatX = 1.021206909;
+double quatX = 0.9800639326;
+//double quatY = -.2070351423;
+double quatY = -0.1986823795;
 int g_redratio; //threshold to decide if a pixel qualifies as dominantly "red"
 
 const double BLOCK_HEIGHT=0.035; // hard-coded top surface of block relative to world frame
@@ -72,6 +86,9 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         int isum = 0; //accumulate the column values of red pixels
         int jsum = 0; //accumulate the row values of red pixels
         int redval, blueval, greenval, testval;
+        int xMin_X = 641, xMin_Y = 481, yMin_X = 641, yMin_Y = 481, xMax_X = -1, xMax_Y = -1;
+        double distance = 0.0, distance_x = 0.0;
+        double angle = 0.0;
         cv::Vec3b rgbpix; // OpenCV representation of an RGB pixel
         //comb through all pixels (j,i)= (row,col)
         for (int i = 0; i < cv_ptr->image.cols; i++) {
@@ -91,6 +108,20 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
                     npix++; //note that found another red pixel
                     isum += i; //accumulate row and col index vals
                     jsum += j;
+                    
+                    // Check for edge for use in orientation:
+                    if(i < xMin_X){
+                    	xMin_X = i;
+                    	xMin_Y = j;
+                    }
+                    if(j < yMin_Y){
+                    	yMin_X = i;
+                    	yMin_Y = j;
+                    }
+                    if(i > xMax_X){
+                    	xMax_X = i;
+                    	xMax_Y = j;
+                    }                    
                 } else { //else paint it black
                     cv_ptr->image.at<cv::Vec3b>(j, i)[0] = 0;
                     cv_ptr->image.at<cv::Vec3b>(j, i)[1] = 0;
@@ -98,6 +129,18 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
                 }
             }
         }
+        //used to check if side being evaluated is a small edge or large edge
+        distance = sqrt((xMin_X - yMin_X)*(xMin_X - yMin_X) + (xMin_Y - yMin_Y)*(xMin_Y - yMin_Y));
+        //used to calculate if yaw is 0 or 90 degrees
+        distance_x = sqrt((xMax_X - xMin_X)*(xMax_X - xMin_X) + (xMax_Y - xMin_Y)*(xMax_Y - xMin_Y));
+        angle = atan((yMin_X - xMin_X)/(yMin_Y - xMin_Y));
+        
+        // CALCULATE ORIENTATION HERE
+        // if distance between xmin and ymin are small, rotate the orientation 90deg
+        if((distance < 20 && distance != 0) || (distance == 0 && distance_x > 20)){
+	        angle += M_PI/2;
+        }
+        
         //cout << "npix: " << npix << endl;
         //paint in a blue square at the centroid:
         int half_box = 5; // choose size of box to paint
@@ -132,14 +175,27 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         //rosrun image_view image_view image:=/image_converter/output_video
         image_pub_.publish(cv_ptr->toImageMsg());
         
-        block_pose_.pose.position.x = i_centroid; //not true, but legal
-        block_pose_.pose.position.y = j_centroid; //not true, but legal
-        double theta=0;
+        // Values for U and V, used for finding the rest
+        double u = (i_centroid - g_central_I) * g_scale;
+        double v = (j_centroid - g_central_J) * g_scale	;
+        
+        // OG way
+        block_pose_.pose.position.x = cos(g_theta) * u - sin(g_theta) * v + g_central_X; //not true, but legal
+        //block_pose_.pose.position.y = sin(g_theta) * u - cos(g_theta) * v + g_central_Y; //not true, but legal
+        
+        // New Way
+        //block_pose_.pose.position.x = quatX * u - quatY * v + g_central_X; //not true, but legal
+        block_pose_.pose.position.y = quatY * u - quatX * v + g_central_Y; // Values obtained using the same J value to fill out the matrix
+        
+        //block_pose_.pose.position.y = block_pose_.pose.position.y - 2 * (g_central_Y - block_pose_.pose.position.y);
+        ROS_INFO("x_r: %f; y_r: %f",block_pose_.pose.position.x,block_pose_.pose.position.y);
+        double theta=g_theta; // was 0 
         
         // need camera info to fill in x,y,and orientation x,y,z,w
         //geometry_msgs::Quaternion quat_est
         //quat_est = xformUtils.convertPlanarPsi2Quaternion(yaw_est);
-        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(theta); //not true, but legal
+        //block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(angle); //not true, but legal
+        block_pose_.pose.orientation.z = angle;
         block_pose_publisher_.publish(block_pose_);
     }
 
