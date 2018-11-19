@@ -164,7 +164,7 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         // need camera info to fill in x,y,and orientation x,y,z,w
         //geometry_msgs::Quaternion quat_est
         //quat_est = xformUtils.convertPlanarPsi2Quaternion(yaw_est);
-        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(0); //not true, but legal
+        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(-1 * theta); //not true, but legal
         block_pose_publisher_.publish(block_pose_);
     }
 
