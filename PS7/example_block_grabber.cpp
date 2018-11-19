@@ -5,6 +5,8 @@
 // the actual action server can be customized for a specific robot, whereas
 // this client is robot agnostic
 
+// modified by Josh Roney (jpr87) for PS7
+
 //launch with roslaunch irb140_description irb140.launch, which places a block at x=0.5, y=0
 // launch action server: rosrun irb140_planner irb140_cart_move_as
 // then run this node
@@ -23,11 +25,12 @@
 #include <std_srvs/SetBool.h>
 using namespace std;
 
-double pos_x = 0.5;
-double pos_y = 0.0;
-double pos_z = 0.035;
-bool new_pos = true;
+double pos_x = 0.5;	//x-position of block
+double pos_y = 0.0;	//y-position of block
+double pos_z = 0.035;	//hard-coded height of the block
+bool new_pos = true;	//boolean to determine if a new position of the block is needed
 
+//Callback function to update the block's position
 void callBack(const geometry_msgs::PoseStamped& msg){
   if(new_pos){  
 	pos_x = msg.pose.position.x;
@@ -47,8 +50,8 @@ int main(int argc, char** argv) {
     CartMotionCommander cart_motion_commander;
     XformUtils xformUtils;
     ros::ServiceClient client = nh.serviceClient<std_srvs::SetBool>("/sticky_finger/link6");
-    //Subscriber to openCV node
-    ros::Subscriber sub = nh.subscribe("block_pose",1,callBack);
+    
+    ros::Subscriber sub = nh.subscribe("block_pose",1,callBack);//Subscriber to openCV node
     std_srvs::SetBool srv;
     srv.request.data = true;
 
