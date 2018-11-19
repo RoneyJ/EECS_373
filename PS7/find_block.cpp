@@ -150,12 +150,12 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         double v = (j_centroid - g_central_J) * g_scale	;
         
         // OG way
-        block_pose_.pose.position.x = cos(g_theta) * u - sin(g_theta) * v + g_central_X; //not true, but legal
-        //block_pose_.pose.position.y = sin(g_theta) * u - cos(g_theta) * v + g_central_Y; //not true, but legal
+        block_pose_.pose.position.x = cos(g_theta) * u - sin(g_theta) * v + g_central_X;
+        block_pose_.pose.position.y = -sin(g_theta) * u - cos(g_theta) * v + g_central_Y;
         
         // New Way
         //block_pose_.pose.position.x = quatX * u - quatY * v + g_central_X; //not true, but legal
-        block_pose_.pose.position.y = quatY * u - quatX * v + g_central_Y; // Values obtained using the same J value to fill out the matrix
+        //block_pose_.pose.position.y = quatY * u - quatX * v + g_central_Y; // Values obtained using the same J value to fill out the matrix
         
         //block_pose_.pose.position.y = block_pose_.pose.position.y - 2 * (g_central_Y - block_pose_.pose.position.y);
         ROS_INFO("x_r: %f; y_r: %f",block_pose_.pose.position.x,block_pose_.pose.position.y);
