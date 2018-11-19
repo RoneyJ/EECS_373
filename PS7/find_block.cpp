@@ -24,10 +24,8 @@ int g_central_I = 319;
 int g_central_J = 239;
 double g_theta = 0.205048;
 
-// Temp stuff used to replace what theta is meant to be, used in getting value for the transofrm matrix
-//double quatX = 1.021206909;
+// Temp stuff used to replace what theta is meant to be, used in getting value for the transform matrix
 double quatX = 0.9800639326;
-//double quatY = -.2070351423;
 double quatY = -0.1986823795;
 int g_redratio; //threshold to decide if a pixel qualifies as dominantly "red"
 
@@ -86,9 +84,6 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         int isum = 0; //accumulate the column values of red pixels
         int jsum = 0; //accumulate the row values of red pixels
         int redval, blueval, greenval, testval;
-        int xMin_X = 641, xMin_Y = 481, yMin_X = 641, yMin_Y = 481, xMax_X = -1, xMax_Y = -1;
-        double distance = 0.0, distance_x = 0.0;
-        double angle = 0.0;
         cv::Vec3b rgbpix; // OpenCV representation of an RGB pixel
         //comb through all pixels (j,i)= (row,col)
         for (int i = 0; i < cv_ptr->image.cols; i++) {
@@ -107,38 +102,13 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
                     cv_ptr->image.at<cv::Vec3b>(j, i)[2] = 255;
                     npix++; //note that found another red pixel
                     isum += i; //accumulate row and col index vals
-                    jsum += j;
-                    
-                    // Check for edge for use in orientation:
-                    if(i < xMin_X){
-                    	xMin_X = i;
-                    	xMin_Y = j;
-                    }
-                    if(j < yMin_Y){
-                    	yMin_X = i;
-                    	yMin_Y = j;
-                    }
-                    if(i > xMax_X){
-                    	xMax_X = i;
-                    	xMax_Y = j;
-                    }                    
+                    jsum += j;                
                 } else { //else paint it black
                     cv_ptr->image.at<cv::Vec3b>(j, i)[0] = 0;
                     cv_ptr->image.at<cv::Vec3b>(j, i)[1] = 0;
                     cv_ptr->image.at<cv::Vec3b>(j, i)[2] = 0;
                 }
             }
-        }
-        //used to check if side being evaluated is a small edge or large edge
-        distance = sqrt((xMin_X - yMin_X)*(xMin_X - yMin_X) + (xMin_Y - yMin_Y)*(xMin_Y - yMin_Y));
-        //used to calculate if yaw is 0 or 90 degrees
-        distance_x = sqrt((xMax_X - xMin_X)*(xMax_X - xMin_X) + (xMax_Y - xMin_Y)*(xMax_Y - xMin_Y));
-        angle = atan((yMin_X - xMin_X)/(yMin_Y - xMin_Y));
-        
-        // CALCULATE ORIENTATION HERE
-        // if distance between xmin and ymin are small, rotate the orientation 90deg
-        if((distance < 20 && distance != 0) || (distance == 0 && distance_x > 20)){
-	        angle += M_PI/2;
         }
         
         //cout << "npix: " << npix << endl;
@@ -194,8 +164,7 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         // need camera info to fill in x,y,and orientation x,y,z,w
         //geometry_msgs::Quaternion quat_est
         //quat_est = xformUtils.convertPlanarPsi2Quaternion(yaw_est);
-        //block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(angle); //not true, but legal
-        block_pose_.pose.orientation.z = angle;
+        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(0); //not true, but legal
         block_pose_publisher_.publish(block_pose_);
     }
 
