@@ -3,6 +3,8 @@
 // convert (sufficiently) red pixels to white, all other pixels black
 // compute centroid of red pixels and display as a blue square
 // publish result of processed image on topic "/image_converter/output_video"
+
+//modified by Josh Ropney (jpr87) for PS7
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -16,17 +18,12 @@
 static const std::string OPENCV_WINDOW = "Open-CV display window";
 using namespace std;
 
-double g_scale = 0.002967; //ORIGINAL
-//double g_scale = 0.0030197051;
-double g_central_X = 0.543;
+double g_scale = 0.002967; //estimated meters/pixel scale of the camera
+double g_central_X = 0.543; //camera's origin point in robot coordinates
 double g_central_Y = 0.321;
-int g_central_I = 319;
-int g_central_J = 239;
-double g_theta = 0.205048;
-
-// Temp stuff used to replace what theta is meant to be, used in getting value for the transform matrix
-double quatX = 0.9800639326;
-double quatY = -0.1986823795;
+int g_central_I = 319; //central x pixel of the camera (from 0 to 639)
+int g_central_J = 239; //central y pixel of the camera (from 0 to 479)
+double g_theta = 0.205048; //angle in which the camera frame is rotated around the z-axis
 int g_redratio; //threshold to decide if a pixel qualifies as dominantly "red"
 
 const double BLOCK_HEIGHT=0.035; // hard-coded top surface of block relative to world frame
@@ -119,9 +116,9 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         if (npix > 0) {
             i_centroid = isum / npix; // average value of u component of red pixels
             j_centroid = jsum / npix; // avg v component
-            x_centroid = ((double) isum)/((double) npix); //floating-pt version
-            y_centroid = ((double) jsum)/((double) npix);
-            ROS_INFO("u_avg: %f; v_avg: %f",x_centroid,y_centroid);
+            x_centroid = ((double) isum)/((double) npix); //block's x centroid
+            y_centroid = ((double) jsum)/((double) npix); //block's y centroid
+            ROS_INFO("u_avg: %f; v_avg: %f",x_centroid,y_centroid); //display centroid position
             //cout << "i_avg: " << i_centroid << endl; //i,j centroid of red pixels
             //cout << "j_avg: " << j_centroid << endl;
             for (int i_box = i_centroid - half_box; i_box <= i_centroid + half_box; i_box++) {
@@ -146,25 +143,20 @@ void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg){
         image_pub_.publish(cv_ptr->toImageMsg());
         
         // Values for U and V, used for finding the rest
-        double u = (i_centroid - g_central_I) * g_scale;
-        double v = (j_centroid - g_central_J) * g_scale	;
+        double u = (i_centroid - g_central_I) * g_scale; //convert the i pixel coordinates to u meters coordinates
+        double v = (j_centroid - g_central_J) * g_scale; //convert the j pixel coordinates to v meters coordinates
         
-        // OG way
+        //Equation to calculate the x and y coordinates in the robot's frame
         block_pose_.pose.position.x = cos(g_theta) * u - sin(g_theta) * v + g_central_X;
         block_pose_.pose.position.y = -sin(g_theta) * u - cos(g_theta) * v + g_central_Y;
         
-        // New Way
-        //block_pose_.pose.position.x = quatX * u - quatY * v + g_central_X; //not true, but legal
-        //block_pose_.pose.position.y = quatY * u - quatX * v + g_central_Y; // Values obtained using the same J value to fill out the matrix
-        
-        //block_pose_.pose.position.y = block_pose_.pose.position.y - 2 * (g_central_Y - block_pose_.pose.position.y);
+        //display calculated x and y position of block
         ROS_INFO("x_r: %f; y_r: %f",block_pose_.pose.position.x,block_pose_.pose.position.y);
-        double theta=g_theta; // was 0 
         
         // need camera info to fill in x,y,and orientation x,y,z,w
         //geometry_msgs::Quaternion quat_est
         //quat_est = xformUtils.convertPlanarPsi2Quaternion(yaw_est);
-        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(-1 * theta); //not true, but legal
+        block_pose_.pose.orientation = xformUtils.convertPlanarPsi2Quaternion(-1 * g_theta); //not true, but legal
         block_pose_publisher_.publish(block_pose_);
     }
 
