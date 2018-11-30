@@ -1,5 +1,6 @@
 //unload_box.cpp:
 // moves a box under camera, then removes sensed parts from box
+// Edited by Josh Roney (jpr87) for PS8
 
 //use a RobotBehaviorInterface object to communicate with the robot behavior action server
 #include <robot_behavior_interface/RobotBehaviorInterface.h>
@@ -31,8 +32,6 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh; // create a node handle; need to pass this to the class constructor
     int ans;
     
-    
- 
     ROS_INFO("instantiating a RobotBehaviorInterface");
     RobotBehaviorInterface robotBehaviorInterface(&nh); //shipmentFiller owns one as well
 
@@ -41,9 +40,6 @@ int main(int argc, char** argv) {
    
     ROS_INFO("instantiating a BoxInspector");
     BoxInspector boxInspector(&nh);
-    
-    ROS_INFO("instantiating a BinInventory");
-	BinInventory binInventory(&nh);
 	
     //instantiate an object of appropriate data type for our move-part commands
     inventory_msgs::Part current_part;
@@ -67,7 +63,7 @@ int main(int argc, char** argv) {
         vector<int> part_indices_precisely_placed;
 
     
-    //use conveyor action  server for multi-tasking
+    //use conveyor action server for multi-tasking
     ROS_INFO("getting a box into position: ");
     int nprint = 0;
     conveyorInterface.move_new_box_to_Q1();  //member function of conveyor interface to move a box to inspection station 1
@@ -80,7 +76,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    //update box pose,  if possible              
+    //update box pose, if possible              
     if (boxInspector.get_box_pose_wrt_world(box_pose_wrt_world)) {
         ROS_INFO_STREAM("box seen at: " << box_pose_wrt_world << endl);
     }
@@ -91,6 +87,8 @@ int main(int argc, char** argv) {
     
     // if survive to here, then box is at Q1 inspection station; 
     
+    //**Work for PS8 begins here**
+
     //inspect the box and classify all observed parts
     boxInspector.update_inspection(desired_models_wrt_world,
         satisfied_models_wrt_world,misplaced_models_actual_coords_wrt_world,
@@ -107,10 +105,8 @@ int main(int argc, char** argv) {
     
 
     if (boxInspector.get_bad_part_Q1(current_part)) {
-        // right here we convert to world coords, get the names of objects in the box, and update the bad part name
-        //posestamped pose <--- from the current_part, then compare to the camera, after conversion thur the bin_inventory code
-		//current_part.name << "piston_rod_part"; 
-		
+        //iterate through all the orphaned parts found in the box to find a part with a pose equivalent to the bad part found via the quality sensor
+	//when a match is found, update the bad part's name with the name of the matching part
 		for (int i=0;i<nparts;i++) {
        		if(abs(orphan_models_wrt_world[i].pose.position.x - current_part.pose.pose.position.x) < 0.05){
        			if(abs(orphan_models_wrt_world[i].pose.position.y - current_part.pose.pose.position.y) < 0.05){
@@ -119,25 +115,21 @@ int main(int argc, char** argv) {
        				}
        			}
        		}
-       		
-       		//ROS_INFO_STREAM("orphaned  parts: "<<orphan_models_wrt_world[i]<<endl);
     	}
+	//output the information of the bad part
         ROS_INFO("found bad part: ");
         ROS_INFO_STREAM(current_part<<endl);
 
-		// ITERATE THROUGH THE LIST OF ORPHANED PARTS, FIND THE ONE THAT HAS COORDINATES THAT ARE CLOSE TO THE CURRENT PART, THEN GET THE NAME FROM IT
+	//await input from the user to remove the bad part
         cout<<"enter 1 to first remove the bad part then remove the other parts: "; //poor-man's breakpoint
-        cin>>ans;        
-        //XXX YOU should attempt to remove the defective part here...
-        // see example, line 139, robotBehaviorInterface.pick_part_from_box();
-		// Remove the part
-		
-		status = robotBehaviorInterface.pick_part_from_box(current_part);
-
-    //use the robot action server to acquire and dispose of the specified part in the box:
+        cin>>ans; 
+  
+	//Remove the part
+	//using the robot action server to acquire and dispose of the specified part in the box:
+	status = robotBehaviorInterface.pick_part_from_box(current_part);
     }    
 
-    //after removing the bad part, re-inspect the box:
+    //after removing the bad part, re-inspect the box and update remaining orphaned parts:
     boxInspector.update_inspection(desired_models_wrt_world,
         satisfied_models_wrt_world,misplaced_models_actual_coords_wrt_world,
         misplaced_models_desired_coords_wrt_world,missing_models_wrt_world,
@@ -146,30 +138,21 @@ int main(int argc, char** argv) {
     ROS_INFO("orphaned parts in box: ");
     nparts = orphan_models_wrt_world.size();
     ROS_INFO("num parts seen in box = %d",nparts);
+
+    //Await user input before removing the remaining parts
     cout<<"enter 1 to remove the other parts: "; //poor-man's breakpoint
     cin>>ans; 
-    // For each object in the orphaned partsin the box
+
+    //Iterate through the orphaned parts and remove each one
     for (int i=0;i<nparts;i++) {
        ROS_INFO_STREAM("orphaned  parts: "<<orphan_models_wrt_world[i]<<endl);
        model_to_part(orphan_models_wrt_world[i], current_part, inventory_msgs::Part::QUALITY_SENSOR_1);
 
-    //use the robot action server to acquire and dispose of the specified part in the box:
-    	status = robotBehaviorInterface.pick_part_from_box(current_part);
+    	//use the robot action server to acquire and dispose of the specified part in the box:
+	status = robotBehaviorInterface.pick_part_from_box(current_part);
     }
 
-
-    // move robot to grasp and discard each part
-
-    //start w/ first part
-
-    //box inspector sees "model", defined in osrf_gear; convert this to our datatype "Part"
-    //void model_to_part(osrf_gear::Model model, inventory_msgs::Part &part, unsigned short int location) 
-    
-
-    //SHOULD REPEAT FOR ALL THE PARTS IN THE BOX
-    //ALSO, WATCH OUT FOR NO PARTS IN THE BOX--ABOVE WILL CRASH
-
-            return 0;
+    return 0;
     //here's an oddity: this node runs to completion.  But sometimes, Linux complains bitterly about
     // *** Error in `/home/wyatt/ros_ws/devel/lib/shipment_filler/unload_box': corrupted size vs. prev_size: 0x000000000227c7c0 ***
     // don't know why.  But does not seem to matter.  If anyone figures this  out, please let me know.
