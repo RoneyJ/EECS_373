@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     if (boxInspector.get_box_pose_wrt_world(box_pose_wrt_world, CAM1)) {
         ROS_INFO_STREAM("box seen at: " << box_pose_wrt_world << endl);
     } else {
-        ROS_WARN("no box seen.  something is wrong! I quit!! >:( ");
+        ROS_WARN("no box seen.  something is wrong! I quit!!");
         exit(1);
     }
 
@@ -285,11 +285,7 @@ int main(int argc, char** argv) {
 
     }
     
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // MOVE TO Q2 NOW																			  //
-    // BELOW IS FIRST ITERATION																	  //
-    // ABOVE IS CODE FOR Q1																		  //
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // MOVE TO Q2 NOW
 
     ROS_WARN("DEBUG: advancing box to Q2, skipping operations at Q1");
     //cout<<"enter 1: ";
@@ -315,7 +311,7 @@ int main(int argc, char** argv) {
     if (boxInspector.get_box_pose_wrt_world(box_pose_wrt_world, CAM2)) {
         ROS_INFO_STREAM("box seen at: " << box_pose_wrt_world << endl);
     } else {
-        ROS_WARN("no box seen.  something is wrong! I quit!! >:( ");
+        ROS_WARN("no box seen.  something is wrong! I quit!!");
         exit(1);
     }
 
