@@ -130,8 +130,6 @@ int main(int argc, char** argv) {
         }
     }
     //update box pose,  if possible      
-    //cout << "enter 1 to get box pose at Q2: ";
-    //cin>>ans;
     if (boxInspector.get_box_pose_wrt_world(box_pose_wrt_world, CAM1)) {
         ROS_INFO_STREAM("box seen at: " << box_pose_wrt_world << endl);
     } else {
@@ -164,19 +162,9 @@ int main(int argc, char** argv) {
     if (boxInspector.get_bad_part_Q(current_part, CAM1)) {
         ROS_INFO("found bad part: ");
         ROS_INFO_STREAM(current_part << endl);
-
-        //cout << "enter 1 to attempt to remove bad part: "; //poor-man's breakpoint
-        //cin>>ans;
         status = robotBehaviorInterface.pick_part_from_box(current_part);
         //and discard it:
         status = robotBehaviorInterface.discard_grasped_part(current_part);
-
-
-
-        //XXX YOU should attempt to remove the defective part here...
-        // see example, line 139, robotBehaviorInterface.pick_part_from_box();
-		
-        //use the robot action server to acquire and dispose of the specified part in the box:
         
     }
 
@@ -186,8 +174,6 @@ int main(int argc, char** argv) {
     //SHOULD REPEAT FOR ALL THE PARTS IN THE BOX
     //ALSO, WATCH OUT FOR NO PARTS IN THE BOX--ABOVE WILL CRASH
     ROS_INFO("done removing orphans; attempt part relocations, as necessary");
-    //cout << "enter 1 to re-inspect: "; //poor-man's breakpoint
-    //cin>>ans;
     boxInspector.update_inspection(desired_models_wrt_world,
             satisfied_models_wrt_world, misplaced_models_actual_coords_wrt_world,
             misplaced_models_desired_coords_wrt_world, missing_models_wrt_world,
@@ -198,11 +184,9 @@ int main(int argc, char** argv) {
     int nparts_misplaced = misplaced_models_actual_coords_wrt_world.size();
     ROS_INFO("found %d misplaced parts", nparts_misplaced);
     bool go_on = false;
-    
-    //cout << "enter  1 to reposition parts" << endl;
-    //cin>>ans;
-    
- 	for(int i = 0; i < nparts_misplaced; i++){
+
+    //adjust all parts
+    for(int i = 0; i < nparts_misplaced; i++){
         model_to_part(misplaced_models_actual_coords_wrt_world[i], current_part, box_location_code);
         //adjust_part_location_no_release(Part sourcePart, Part destinationPart, double timeout = MAX_ACTION_SERVER_WAIT_TIME);
         int index_des_part = part_indices_misplaced[i];
@@ -223,8 +207,8 @@ int main(int argc, char** argv) {
 	}
 
     //populate missing parts  in box:
-    // should repeat for ALL  missing parts
-	for(int i = 0; i < part_indices_missing.size(); i++){
+    //repeated for ALL  missing parts
+    for(int i = 0; i < part_indices_missing.size(); i++){
         int n_missing_part = part_indices_missing[i];
 
         //model_to_part(desired_models_wrt_world[n_missing_part], current_part, inventory_msgs::Part::QUALITY_SENSOR_2);
@@ -256,7 +240,6 @@ int main(int argc, char** argv) {
 
         ROS_INFO("attempting pick...");
         ROS_INFO("attempting to pick part");
-        cout << "enter 1:";
         if (!robotBehaviorInterface.pick_part_from_bin(pick_part)) {
             ROS_INFO("pick failed");
             go_on = false;
@@ -286,10 +269,10 @@ int main(int argc, char** argv) {
     }
     
     // MOVE TO Q2 NOW
+    // BELOW IS FIRST ITERATION																	  
+    // ABOVE IS CODE FOR Q1
 
     ROS_WARN("DEBUG: advancing box to Q2, skipping operations at Q1");
-    //cout<<"enter 1: ";
-    //cin>>ans;
     //advance the box further!
     conveyorInterface.move_box_Q1_to_Q2(); //member function of conveyor interface to move a box to inspection station 1
     while (conveyorInterface.get_box_status() != conveyor_as::conveyorResult::BOX_SEEN_AT_Q2) {
@@ -311,7 +294,7 @@ int main(int argc, char** argv) {
     if (boxInspector.get_box_pose_wrt_world(box_pose_wrt_world, CAM2)) {
         ROS_INFO_STREAM("box seen at: " << box_pose_wrt_world << endl);
     } else {
-        ROS_WARN("no box seen.  something is wrong! I quit!!");
+        ROS_WARN("no box seen.  something is wrong! I quit!! >:( ");
         exit(1);
     }
 
@@ -340,30 +323,15 @@ int main(int argc, char** argv) {
     if (boxInspector.get_bad_part_Q(current_part, CAM2)) {
         ROS_INFO("found bad part: ");
         ROS_INFO_STREAM(current_part << endl);
-
-        //cout << "enter 1 to attempt to remove bad part: "; //poor-man's breakpoint
-        //cin>>ans;
         status = robotBehaviorInterface.pick_part_from_box(current_part);
         //and discard it:
         status = robotBehaviorInterface.discard_grasped_part(current_part);
-
-
-
-        //XXX YOU should attempt to remove the defective part here...
-        // see example, line 139, robotBehaviorInterface.pick_part_from_box();
-		
-        //use the robot action server to acquire and dispose of the specified part in the box:
-        
     }
 
     //after removing the bad part, re-inspect the box:
- 
-
     //SHOULD REPEAT FOR ALL THE PARTS IN THE BOX
     //ALSO, WATCH OUT FOR NO PARTS IN THE BOX--ABOVE WILL CRASH
     ROS_INFO("done removing orphans; attempt part relocations, as necessary");
-    //cout << "enter 1 to re-inspect: "; //poor-man's breakpoint
-    //cin>>ans;
     boxInspector.update_inspection(desired_models_wrt_world,
             satisfied_models_wrt_world, misplaced_models_actual_coords_wrt_world,
             misplaced_models_desired_coords_wrt_world, missing_models_wrt_world,
@@ -375,10 +343,7 @@ int main(int argc, char** argv) {
     ROS_INFO("found %d misplaced parts", nparts_misplaced);
     go_on = false;
     
-    //cout << "enter  1 to reposition parts" << endl;
-    //cin>>ans;
-    
- 	for(int i = 0; i < nparts_misplaced; i++){
+    for(int i = 0; i < nparts_misplaced; i++){
         model_to_part(misplaced_models_actual_coords_wrt_world[i], current_part, box_location_code);
         //adjust_part_location_no_release(Part sourcePart, Part destinationPart, double timeout = MAX_ACTION_SERVER_WAIT_TIME);
         int index_des_part = part_indices_misplaced[i];
@@ -449,8 +414,6 @@ int main(int argc, char** argv) {
         }
         //place  part:
         ROS_INFO("attempting to place part");
-        //cout << "enter 1:";
-        //cin>>ans;
         if (!robotBehaviorInterface.place_part_in_box_no_release(place_part)) {
             ROS_INFO("placement failed");
             go_on = false;

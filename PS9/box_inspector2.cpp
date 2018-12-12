@@ -349,7 +349,6 @@ bool BoxInspector2::get_new_snapshot_from_box_cam(int cam_num) {
             break;
         case CAM2:
             while ((!got_new_snapshot2_) && (timer < BOX_INSPECTOR_TIMEOUT)) {
-                ROS_WARN("fixed?");
                 ros::spinOnce();
                 ros::Duration(dt).sleep();
                 timer += dt;
@@ -474,7 +473,6 @@ bool BoxInspector2::get_filtered_snapshots_from_box_cam2(osrf_gear::LogicalCamer
             box_inspector_image=box_inspector_image_;
             break;
         case CAM2:
-            ROS_WARN("Fixed???!");
             box_inspector_image=box_inspector_image2_;
             break;     
         default:
